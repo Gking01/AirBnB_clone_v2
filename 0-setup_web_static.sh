@@ -1,48 +1,58 @@
 #!/usr/bin/env bash
-# sets up my web servers for the deployment of web_static
 
-echo -e "\e[1;32m START\e[0m"
+# Install Nginx if it is not already installed
+if ! [ -x "$(command -v nginx)" ]; then
+  apt-get update
+  apt-get install nginx -y
+fi
 
-#--Updating the packages
-sudo apt-get -y update
-sudo apt-get -y install nginx
-echo -e "\e[1;32m Packages updated\e[0m"
-echo
+# Create the /data/ folder if it doesn't already exist
+if ! [ -d "/data" ]; then
+  mkdir /data
+fi
 
-#--configure firewall
-sudo ufw allow 'Nginx HTTP'
-echo -e "\e[1;32m Allow incomming NGINX HTTP connections\e[0m"
-echo
+# Create the /data/web_static/ folder if it doesn't already exist
+if ! [ -d "/data/web_static" ]; then
+  mkdir /data/web_static
+fi
 
-#--created the dir
-sudo mkdir -p /data/web_static/releases/test /data/web_static/shared
-echo -e "\e[1;32m directories created"
-echo
+# Create the /data/web_static/releases/ folder if it doesn't already exist
+if ! [ -d "/data/web_static/releases" ]; then
+  mkdir /data/web_static/releases
+fi
 
-#--adds test string
-echo "<h1>Welcome to www.beta-scribbles.tech</h1>" > /data/web_static/releases/test/index.html
-echo -e "\e[1;32m Test string added\e[0m"
-echo
+# Create the /data/web_static/shared/ folder if it doesn't already exist
+if ! [ -d "/data/web_static/shared" ]; then
+  mkdir /data/web_static/shared
+fi
 
-#--prevent overwrite
-if [ -d "/data/web_static/current" ];
-then
-    echo "path /data/web_static/current exists"
-    sudo rm -rf /data/web_static/current;
-fi;
-echo -e "\e[1;32m prevent overwrite\e[0m"
-echo
+# Create the /data/web_static/releases/test/ folder if it doesn't already exist
+if ! [ -d "/data/web_static/releases/test" ]; then
+  mkdir /data/web_static/releases/test
+fi
 
-#--create symbolic link
-sudo ln -sf /data/web_static/releases/test/ /data/web_static/current
-sudo chown -hR ubuntu:ubuntu /data
+# Create a fake HTML file /data/web_static/releases/test/index.html with simple content
+echo "<html>
+  <head>
+  </head>
+  <body>
+    <h1> Welcome to www.g-site.tech </h1>
+  </body>
+</html>" > /data/web_static/releases/test/index.html
 
-sudo sed -i '38i\\tlocation /hbnb_static/ {\n\t\talias /data/web_static/current/;\n\t}\n' /etc/nginx/sites-available/default
+# Create a symbolic link /data/web_static/current linked to the /data/web_static/releases/test/ folder
+# If the symbolic link already exists, delete it and recreate it
+if [ -L "/data/web_static/current" ]; then
+  rm /data/web_static/current
+fi
+ln -s /data/web_static/releases/test /data/web_static/current
 
-sudo ln -sf '/etc/nginx/sites-available/default' '/etc/nginx/sites-enabled/default'
-echo -e "\e[1;32m Symbolic link created\e[0m"
-echo
+# Give ownership of the /data/ folder to the ubuntu user and group (recursively)
+chown -R ubuntu:ubuntu /data
 
-#--restart NGINX
-sudo service nginx restart
-echo -e "\e[1;32m restart NGINX\e[0m"
+# Update the Nginx configuration to serve the content of /data/web_static/current/ to hbnb_static
+# Use alias inside the Nginx configuration
+sed -i "s|root /var/www/html;|alias /data/web_static/current;|g" /etc/nginx/sites-available/default
+
+# Restart Nginx
+systemctl restart nginx
